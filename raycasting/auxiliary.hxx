@@ -1,8 +1,8 @@
 #include <cmath>
 #include <iostream>
 
-#define HEIGHT 10
-#define WIDTH 10
+#define HEIGHT 100
+#define WIDTH 100
 #define PI 3.14159265
 
 template <typename T> struct Vec3 {
@@ -56,6 +56,13 @@ template <typename T> Vec3<T> Cross(Vec3<T> &input1, Vec3<T> &input2) {
   return output;
 }
 
+int GetPointIndex(Vec3<int>& index, const int *dims)
+{
+  int sliceSize = (dims[0])*(dims[1]);
+  int width = (dims[0]);
+  return index.z*sliceSize + index.y*width + index.x;
+}
+
 template <typename T> struct Camera {
   T near, far;
   T angle;
@@ -102,7 +109,7 @@ struct TransferFunction {
   int numBins;
   unsigned char *colors; // size is 3*numBins
   double *opacities;     // size is numBins
-
+  double scalingFactor;
   // Take in a value and applies the transfer function.
   // Step #1: figure out which bin "value" lies in.
   // If "min" is 2 and "max" is 4, and there are 10 bins, then
@@ -120,7 +127,7 @@ struct TransferFunction {
   // and the opacity at "opacities[5]".
   void ApplyTransferFunction(double value, unsigned char *RGB,
                              double &opacity) {
-     int bin = GetBin(value);
+     int bin = (value - min) * scalingFactor;
      RGB[0] = colors[3*bin+0];
      RGB[1] = colors[3*bin+1];
      RGB[2] = colors[3*bin+2];
@@ -168,8 +175,8 @@ TransferFunction SetupTransferFunction(void) {
   for (i = 0; i < numControlPoints - 1; i++) {
     int start = controlPointPositions[i] * rv.numBins;
     int end = controlPointPositions[i + 1] * rv.numBins + 1;
-    cerr << "Working on " << i << "/" << i + 1 << ", with range " << start
-         << "/" << end << endl;
+    /*cerr << "Working on " << i << "/" << i + 1 << ", with range " << start
+         << "/" << end << endl;*/
     if (end >= rv.numBins)
       end = rv.numBins - 1;
     for (int j = start; j <= end; j++) {
@@ -185,5 +192,6 @@ TransferFunction SetupTransferFunction(void) {
             controlPointColors[3 * i + k];
     }
   }
+  rv.scalingFactor = 256 / (rv.max - rv.min);
   return rv;
 }

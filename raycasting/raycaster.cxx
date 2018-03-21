@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 #include "auxiliary.hxx"
@@ -18,8 +19,8 @@ void GenerateRay(Vec3<T> &ray, int pixelX, int pixelY, Vec3<T> look,
 }
 
 template <typename T>
-bool CheckRayVolumeIntersection(Vec3<T> &origin, Vec3<T> &direction, T *bounds,
-                                Vec3<T> near, Vec3<T> far) {
+bool CheckRayVolumeIntersection(Vec3<T> &origin, Vec3<T> &direction,
+                                T *bounds) {
   T txmin, txmax, tymin, tymax, tzmin, tzmax;
   Vec3<T> inverse = Inverse(direction);
 
@@ -47,6 +48,73 @@ bool CheckRayVolumeIntersection(Vec3<T> &origin, Vec3<T> &direction, T *bounds,
   return true;
 }
 
+template <typename T>
+T GetFieldValueForSample(Vec3<T> &currentSample, int *dims, T *bounds,
+                         Vec3<T> &gridprop, T *fieldData) {
+
+  // TODO : Check if point is in bounds.
+  Vec3<T> translated = Vec3<int>((currentSample.x - bounds[0]) * gridprop.x,
+                                 (currentSample.y - bounds[2]) * gridprop.y,
+                                 (currentSample.z - bounds[4]) * gridprop.z);
+
+  Vec3<int> vertex0 =
+      (floor(translated.x), floor(translated.y), floor(translated.z));
+  int index0 = GetPointIndex(vertex0, dims);
+  Vec3<int> vectex1 = vertex0 + Vec3<int>(1, 0, 0);
+  int index1 = GetPointIndex(vertex0, dims);
+  Vec3<int> vectex2 = vertex0 + Vec3<int>(0, 0, 1);
+  int index2 = GetPointIndex(vertex0, dims);
+  Vec3<int> vectex3 = vertex0 + Vec3<int>(1, 0, 1);
+  int index3 = GetPointIndex(vertex0, dims);
+  Vec3<int> vectex4 = vertex0 + Vec3<int>(0, 1, 0);
+  int index4 = GetPointIndex(vertex0, dims);
+  Vec3<int> vectex5 = vertex0 + Vec3<int>(1, 1, 0);
+  int index5 = GetPointIndex(vertex0, dims);
+  Vec3<int> vectex6 = vertex0 + Vec3<int>(0, 1, 1);
+  int index6 = GetPointIndex(vertex0, dims);
+  Vec3<int> vectex7 = vertex0 + Vec3<int>(1, 1, 1);
+  int index7 = GetPointIndex(vertex0, dims);
+
+  T difference1 = translated.x - vertex0.x;
+  T difference2 = translated.y - vertex0.y;
+  T difference3 = translated.z - vertex0.z;
+
+  //Interpolation in X (0,1), (2,3), (4,5), (6,7)
+  T f01 = Interpolate(difference1);
+  T f23 = Interpolate(difference1);
+  T f45 = Interpolate(difference1);
+  T f67 = Interpolate(difference1);
+
+  //Interpolation in Y
+
+
+  //Interpolaiton in Z
+
+
+}
+
+template <typename T>
+void Sample(Camera<T> &camera, Vec3<T> &ray, const int samplerate,
+            T samplingdiff, T *bounds, int *dims, Vec3<T> &gridprop,
+            T *fieldData, Vec3<T> &pixelColor, TransferFunction &transfer) {
+
+  double distance = camera.near;
+  Vec3<T> origin = camera.position;
+
+  PrintVector(origin);
+  PrintVector(ray);
+  std::cout << "Sampling step size : " << samplingdiff << std::endl;
+  Vec3<T> currentSample;
+  int count = 0;
+  do {
+    Vec3<T> offset = Multiply(ray, distance);
+    currentSample = origin + offset;
+    PrintVector(currentSample);
+    distance += samplingdiff;
+    ++count;
+  } while (count < 10);
+}
+
 int main(int argc, char **argv) {
 
   if (argc < 2) {
@@ -56,6 +124,7 @@ int main(int argc, char **argv) {
 
   const int height = HEIGHT;
   const int width = WIDTH;
+  const int samplerate = 256;
   const std::string filename(argv[1]);
   int dims[3];
   double bounds[6];
@@ -77,23 +146,41 @@ int main(int argc, char **argv) {
   double *fieldData =
       (double *)rgrid->GetPointData()->GetScalars()->GetVoidPointer(0);
 
+  Vec3<double> gridprop = Vec3<double>(dims[0] / (bounds[1] - bounds[0]),
+                                       dims[1] / (bounds[3] - bounds[2]),
+                                       dims[2] / (bounds[5] - bounds[4]));
+
   Camera<double> camera = SetupCamera<double>();
-
   Vec3<double> look, forX, forY;
-
   CalculateViewParameters(camera, look, forX, forY);
-  long int intersections = 0;
+  std::cout << "Sampling rate : " << camera.far - camera.near << std::endl;
+  double samplingdiff = (camera.far - camera.near) / (double)(samplerate - 1);
 
+  TransferFunction transfer = SetupTransferFunction();
+
+  long int intersections = 0;
   Vec3<double> ray;
-  for (size_t pixelY = 0; pixelY < height; ++pixelY)
-    for (size_t pixelX = 0; pixelX < width; ++pixelX) {
+
+  // RGB store for colors in the final image
+  double *imagedata = new double[height * width * 3];
+
+  for (size_t pixelX = 50; pixelX < 51 /*width*/; ++pixelX)
+    for (size_t pixelY = 50; pixelY < 51 /*height*/; ++pixelY) {
       GenerateRay(ray, pixelX, pixelY, look, forX, forY);
       Normalize(ray);
       bool intersects =
           CheckRayVolumeIntersection(camera.position, ray, bounds);
+      Vec3<double> pixelcolor(0, 0, 0);
       if (intersects) {
-        Sample(Camera, ray, bounds);
+        std::cout << pixelX << ", " << pixelY << std::endl;
+        Sample(camera, ray, samplerate, samplingdiff, bounds, dims, gridprop,
+               fieldData, pixelcolor, transfer);
+        ++intersections;
       }
+      int pixelindex = (pixelY * width + pixelX) * 3;
+      imagedata[pixelindex++] = pixelcolor.x;
+      imagedata[pixelindex++] = pixelcolor.y;
+      imagedata[pixelindex++] = pixelcolor.z;
     }
   std::cout << "Number of intersection : " << intersections << " out of "
             << height * width << " pixels" << std::endl;
