@@ -3,12 +3,15 @@
 
 #define HEIGHT 100
 #define WIDTH 100
+#define SAMPLES 256
+
 #define PI 3.14159265
 
 template <typename T, typename U>
 T Interpolate(U fieldValue1, U fieldValue2, T proportion)
 {
-  return (1.0 - proportion)*fieldValue1 + proportion*fieldValue2;
+  //return (1.0f - proportion)*fieldvalue1 + proportion*fieldvalue2;
+  return fieldValue1 + proportion*(fieldValue2 - fieldValue1);
 }
 
 template <typename T> struct Vec3 {

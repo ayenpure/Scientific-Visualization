@@ -6,8 +6,8 @@
 #include "vtkDataArray.h"
 #include "vtkDataSetReader.h"
 #include "vtkImageData.h"
-#include "vtkPointData.h"
 #include "vtkPNGWriter.h"
+#include "vtkPointData.h"
 #include "vtkRectilinearGrid.h"
 
 template <typename T>
@@ -52,94 +52,139 @@ bool CheckRayVolumeIntersection(Vec3<T> &origin, Vec3<T> &direction,
 
 template <typename T, typename U>
 T GetFieldValueForSample(Vec3<T> &currentSample, int *dims, double *bounds,
-                         Vec3<T> &gridprop, U *fieldData) {
+                         Vec3<U> &gridprop, U *fieldData, U *xCoords,
+                         U *yCoords, U *zCoords) {
 
-  if( (currentSample.x < bounds[0] || currentSample.x > bounds[1])
-   || (currentSample.y < bounds[2] || currentSample.y > bounds[3])
-   || (currentSample.z < bounds[4] || currentSample.x > bounds[5]))
+  if ((currentSample.x < bounds[0] || currentSample.x > bounds[1]) ||
+      (currentSample.y < bounds[2] || currentSample.y > bounds[3]) ||
+      (currentSample.z < bounds[4] || currentSample.x > bounds[5]))
     return 0;
 
-  // TODO : Check if point is in bounds.
-  Vec3<T> translated = Vec3<T>((currentSample.x - bounds[0]) * gridprop.x,
-                                 (currentSample.y - bounds[2]) * gridprop.y,
-                                 (currentSample.z - bounds[4]) * gridprop.z);
+  Vec3<int> vertex0(0, 0, 0);
+  for (int i = 0; i < dims[0] - 1; i++) {
+    if (xCoords[i] <= currentSample.x && currentSample.x < xCoords[i + 1])
+      vertex0.x = i;
+  }
+  for (int i = 0; i < dims[1] - 1; i++) {
+    if (yCoords[i] <= currentSample.y && currentSample.y < yCoords[i + 1])
+      vertex0.y = i;
+  }
+  for (int i = 0; i < dims[2] - 1; i++) {
+    if (zCoords[i] <= currentSample.z && currentSample.z < zCoords[i + 1])
+      vertex0.z = i;
+  }
 
-  Vec3<int> vertex0 =
-      Vec3<int>((int)translated.x, (int)translated.y, (int)translated.z);
+  //  std::cout << "Looking for point" << "\t";
+  // PrintVector(currentSample);
+  /*Vec3<int> vertex0 =
+      Vec3<int>((int)translated.x, (int)translated.y, (int)translated.z);*/
+  //  std::cout << "Found Cell" << "\t";
+  // PrintVector(vertex0);
+
   int index0 = GetPointIndex(vertex0, dims);
-  Vec3<int> vertex1 = Vec3<int>(vertex0.x + 1,vertex0.y + 0,vertex0.z + 0);
+  Vec3<int> vertex1 = Vec3<int>(vertex0.x + 1, vertex0.y + 0, vertex0.z + 0);
   int index1 = GetPointIndex(vertex1, dims);
-  Vec3<int> vertex2 = Vec3<int>(vertex0.x + 0,vertex0.y + 0,vertex0.z + 1);
+  Vec3<int> vertex2 = Vec3<int>(vertex0.x + 0, vertex0.y + 0, vertex0.z + 1);
   int index2 = GetPointIndex(vertex2, dims);
-  Vec3<int> vertex3 = Vec3<int>(vertex0.x + 1,vertex0.y + 0,vertex0.z + 1);
+  Vec3<int> vertex3 = Vec3<int>(vertex0.x + 1, vertex0.y + 0, vertex0.z + 1);
   int index3 = GetPointIndex(vertex3, dims);
-  Vec3<int> vertex4 = Vec3<int>(vertex0.x + 0,vertex0.y + 1,vertex0.z + 0);
+  Vec3<int> vertex4 = Vec3<int>(vertex0.x + 0, vertex0.y + 1, vertex0.z + 0);
   int index4 = GetPointIndex(vertex4, dims);
-  Vec3<int> vertex5 = Vec3<int>(vertex0.x + 1,vertex0.y + 1,vertex0.z + 0);
+  Vec3<int> vertex5 = Vec3<int>(vertex0.x + 1, vertex0.y + 1, vertex0.z + 0);
   int index5 = GetPointIndex(vertex5, dims);
-  Vec3<int> vertex6 = Vec3<int>(vertex0.x + 0,vertex0.y + 1,vertex0.z + 1);
+  Vec3<int> vertex6 = Vec3<int>(vertex0.x + 0, vertex0.y + 1, vertex0.z + 1);
   int index6 = GetPointIndex(vertex6, dims);
-  Vec3<int> vertex7 = Vec3<int>(vertex0.x + 1,vertex0.y + 1,vertex0.z + 1);
+  Vec3<int> vertex7 = Vec3<int>(vertex0.x + 1, vertex0.y + 1, vertex0.z + 1);
   int index7 = GetPointIndex(vertex7, dims);
 
-  T difference1 = translated.x - vertex0.x;
-  T difference2 = translated.y - vertex0.y;
-  T difference3 = translated.z - vertex0.z;
+  U proportionX = (currentSample.x - xCoords[vertex0.x]) /
+                  (xCoords[vertex0.x + 1] - xCoords[vertex0.x]);
+  U proportionY = (currentSample.y - yCoords[vertex0.y]) /
+                  (yCoords[vertex0.y + 1] - yCoords[vertex0.y]);
+  U proportionZ = (currentSample.z - zCoords[vertex0.z]) /
+                  (zCoords[vertex0.z + 1] - zCoords[vertex0.z]);
 
-  //Interpolation in X (0,1), (2,3), (4,5), (6,7)
-  T f01 = Interpolate(fieldData[index0], fieldData[index1], difference1);
-  T f23 = Interpolate(fieldData[index2], fieldData[index3], difference1);
-  T f45 = Interpolate(fieldData[index4], fieldData[index5], difference1);
-  T f67 = Interpolate(fieldData[index6], fieldData[index7], difference1);
+  // Interpolation in X (0,1), (2,3), (4,5), (6,7)
+  U f01 = Interpolate(fieldData[index0], fieldData[index1], proportionX);
+  U f23 = Interpolate(fieldData[index2], fieldData[index3], proportionX);
+  U f45 = Interpolate(fieldData[index4], fieldData[index5], proportionX);
+  U f67 = Interpolate(fieldData[index6], fieldData[index7], proportionX);
 
-  //Interpolation in Y
-  T f0123 = Interpolate(f01, f23, difference2);
-  T f4567 = Interpolate(f45, f67, difference2);
+  // Interpolation in Z
+  U f0123 = Interpolate(f01, f23, proportionZ);
+  U f4567 = Interpolate(f45, f67, proportionZ);
 
-  //Interpolaiton in Z
-  T sampleValue = Interpolate(f0123, f4567, difference3);
-  return sampleValue;
+  // Interpolaiton in Y
+  U sampleValue = Interpolate(f0123, f4567, proportionY);
+  return (T)sampleValue;
 }
 
 template <typename T, typename U>
-void Sample(Camera<T> &camera, Vec3<T> &ray, const int samplerate,
-            T samplingdiff, double *bounds, int *dims, Vec3<T> &gridprop,
-            U *fieldData, Vec3<unsigned char> &pixelColor, TransferFunction &transfer) {
+void Sample(Camera<T> &camera, Vec3<T> &ray, const int samples, T samplingdiff,
+            double *bounds, int *dims, Vec3<U> &gridprop, U *fieldData,
+            Vec3<unsigned char> &pixelColor, TransferFunction &transfer,
+            U *xCoords, U *yCoords, U *zCoords) {
 
   double distance = camera.near;
   Vec3<T> origin = camera.position;
 
-  //PrintVector(origin);
-  //PrintVector(ray);
-  //std::cout << "Sampling step size : " << samplingdiff << std::endl;
+  // PrintVector(origin);
+  // PrintVector(ray);
+  // std::cout << "Sampling step size : " << samplingdiff << std::endl;
   Vec3<T> currentSample;
   int count = 0;
-
-  Vec3<unsigned char> color(0, 0, 0);
+  Vec3<double> color(0, 0, 0);
   T opacity = 0;
   do {
+    //std::cout << "********************* sample :" << count << "*********************" << std::endl;
     Vec3<T> offset = Multiply(ray, distance);
     currentSample = origin + offset;
     //PrintVector(currentSample);
-    T sampleValue = GetFieldValueForSample(currentSample, dims, bounds, gridprop, fieldData);
+    T sampleValue =
+        GetFieldValueForSample(currentSample, dims, bounds, gridprop, fieldData,
+                               xCoords, yCoords, zCoords);
     //std::cout << "field value : " << sampleValue << std::endl;
     T backopacity = 0;
-    Vec3<unsigned char> backcolor(0,0,0);
+    Vec3<unsigned char> backcolor(0, 0, 0);
     transfer.ApplyTransferFunction(sampleValue, backcolor, backopacity);
-    //std::cout << "RGB : " << (int)rgb.x << ", " << (int)rgb.y << ", " << (int) rgb.z << " ";
-    //std::cout << "opacity : " << opacity << std::endl;
-    //Blending values
-    color.x = color.x + (1 - opacity)*backopacity*backcolor.x;
-    color.y = color.y + (1 - opacity)*backopacity*backcolor.y;
-    color.z = color.z + (1 - opacity)*backopacity*backcolor.z;
-    opacity = opacity + (1-opacity)*backopacity;
-    opacity = 1 - pow((1 - opacity),500/256);
+/*
+    std::cout << "mapped color : " << (int)backcolor.x << ", "
+              << (int)backcolor.y << ", " << (int)backcolor.z << std::endl;
+    std::cout << "mapped opacity : " << backopacity << std::endl;
+*/
+    backopacity = 1 - pow((1 - backopacity), 500 / (T)samples);
+    //std::cout << "Corrected opacity : " << backopacity << std::endl;
+
+    // Blending values
+    color.x =
+        color.x + (1 - opacity) * backopacity * (backcolor.x / 255.0);
+    color.y =
+        color.y + (1 - opacity) * backopacity * (backcolor.y / 255.0);
+    color.z =
+        color.z + (1 - opacity) * backopacity * (backcolor.z / 255.0);
+    opacity = opacity + (1 - opacity) * backopacity;
+
+    /*color.x =
+        backopacity * backcolor.x / 255.0 + (1 - backopacity) * opacity * (color.x);
+    color.x =
+        backopacity * backcolor.y / 255.0 + (1 - backopacity) * opacity * (color.y);
+    color.x =
+        backopacity * backcolor.z / 255.0 + (1 - backopacity) * opacity * (color.z);
+    opacity = backopacity + (1 - backopacity) * opacity;
+*/
+
+/*    std::cout << "Running : " << color.x << ", " << color.y << ", " << color.z
+              << std::endl;
+    std::cout << "Opacity : " << opacity << std::endl;
+*/
     distance += samplingdiff;
     ++count;
-  } while (count < 256);
-  pixelColor.x = color.x*opacity;
-  pixelColor.y = color.y*opacity;
-  pixelColor.z = color.z*opacity;
+  } while (count < samples);
+  pixelColor.x = (unsigned char)(color.x * 255);
+  pixelColor.y = (unsigned char)(color.y * 255);
+  pixelColor.z = (unsigned char)(color.z * 255);
+/*  std::cout << "Final : " << (int)pixelColor.x << ", " << (int)pixelColor.y << ", " << (int)pixelColor.z
+              << std::endl; */
 }
 
 int main(int argc, char **argv) {
@@ -151,7 +196,7 @@ int main(int argc, char **argv) {
 
   const int height = HEIGHT;
   const int width = WIDTH;
-  const int samplerate = 256;
+  const int samples = SAMPLES;
   const std::string filename(argv[1]);
   int dims[3];
   double bounds[6];
@@ -164,50 +209,53 @@ int main(int argc, char **argv) {
   rgrid->GetDimensions(dims);
   rgrid->GetBounds(bounds);
 
+  float *xCoords = (float *)rgrid->GetXCoordinates()->GetVoidPointer(0);
+  float *yCoords = (float *)rgrid->GetYCoordinates()->GetVoidPointer(0);
+  float *zCoords = (float *)rgrid->GetZCoordinates()->GetVoidPointer(0);
   float *fieldData =
       (float *)rgrid->GetPointData()->GetScalars()->GetVoidPointer(0);
 
-  Vec3<double> gridprop = Vec3<double>(dims[0] / (bounds[1] - bounds[0]),
-                                       dims[1] / (bounds[3] - bounds[2]),
-                                       dims[2] / (bounds[5] - bounds[4]));
+  Vec3<float> gridprop =
+      Vec3<float>(dims[0] / (xCoords[dims[0] - 1] - xCoords[0]),
+                  dims[1] / (yCoords[dims[1] - 1] - yCoords[0]),
+                  dims[2] / (zCoords[dims[2] - 1] - xCoords[0]));
 
   Camera<double> camera = SetupCamera<double>();
   Vec3<double> look, forX, forY;
   CalculateViewParameters(camera, look, forX, forY);
-  //std::cout << "Sampling rate : " << camera.far - camera.near << std::endl;
-  double samplingdiff = (camera.far - camera.near) / (double)(samplerate - 1);
+  // std::cout << "Sampling rate : " << camera.far - camera.near << std::endl;
+  double samplingdiff = (camera.far - camera.near) / (double)(samples - 1);
 
   TransferFunction transfer = SetupTransferFunction();
 
   long int intersections = 0;
   Vec3<double> ray;
 
-
   vtkImageData *image = vtkImageData::New();
   image->SetDimensions(width, height, 1);
   image->AllocateScalars(VTK_UNSIGNED_CHAR, 3);
-  unsigned char *imagedata = (unsigned char *) image->GetScalarPointer(0, 0, 0);
+  unsigned char *imagedata = (unsigned char *)image->GetScalarPointer(0, 0, 0);
 
   for (size_t pixelX = 0; pixelX < width; ++pixelX)
     for (size_t pixelY = 0; pixelY < height; ++pixelY) {
       GenerateRay(ray, pixelX, pixelY, look, forX, forY);
       Normalize(ray);
-      bool intersects =
-          CheckRayVolumeIntersection(camera.position, ray, bounds);
+      /*bool intersects =
+          CheckRayVolumeIntersection(camera.position, ray, bounds);*/
       Vec3<unsigned char> pixelcolor(0, 0, 0);
-      if (intersects) {
-        //std::cout << pixelX << ", " << pixelY << std::endl;
-        Sample(camera, ray, samplerate, samplingdiff, bounds, dims, gridprop,
-               fieldData, pixelcolor, transfer);
-        ++intersections;
-      }
+      // if (intersects) {
+      // std::cout << pixelX << ", " << pixelY << std::endl;
+      Sample(camera, ray, samples, samplingdiff, bounds, dims, gridprop,
+             fieldData, pixelcolor, transfer, xCoords, yCoords, zCoords);
+      //++intersections;
+      //}
       int pixelindex = (pixelY * width + pixelX) * 3;
       imagedata[pixelindex++] = pixelcolor.x;
       imagedata[pixelindex++] = pixelcolor.y;
       imagedata[pixelindex++] = pixelcolor.z;
     }
-  std::cout << "Number of intersection : " << intersections << " out of "
-            << height * width << " pixels" << std::endl;
+  /*std::cout << "Number of intersection : " << intersections << " out of "
+            << height * width << " pixels" << std::endl;*/
 
   const std::string outfilename("output.png");
   vtkPNGWriter *writer = vtkPNGWriter::New();
