@@ -53,26 +53,26 @@ T GetFieldValueForSample(Vec3<T> &currentSample, int *dims, T *bounds,
                          Vec3<T> &gridprop, T *fieldData) {
 
   // TODO : Check if point is in bounds.
-  Vec3<T> translated = Vec3<int>((currentSample.x - bounds[0]) * gridprop.x,
+  Vec3<T> translated = Vec3<T>((currentSample.x - bounds[0]) * gridprop.x,
                                  (currentSample.y - bounds[2]) * gridprop.y,
                                  (currentSample.z - bounds[4]) * gridprop.z);
 
   Vec3<int> vertex0 =
-      (floor(translated.x), floor(translated.y), floor(translated.z));
+      Vec3<int>((int)translated.x, (int)translated.y, (int)translated.z);
   int index0 = GetPointIndex(vertex0, dims);
-  Vec3<int> vectex1 = vertex0 + Vec3<int>(1, 0, 0);
+  Vec3<int> vectex1 = Vec3<int>(vertex0.x + 1,vertex0.y + 0,vertex0.z + 0);
   int index1 = GetPointIndex(vertex0, dims);
-  Vec3<int> vectex2 = vertex0 + Vec3<int>(0, 0, 1);
+  Vec3<int> vectex2 = Vec3<int>(vertex0.x + 0,vertex0.y + 0,vertex0.z + 1);
   int index2 = GetPointIndex(vertex0, dims);
-  Vec3<int> vectex3 = vertex0 + Vec3<int>(1, 0, 1);
+  Vec3<int> vectex3 = Vec3<int>(vertex0.x + 1,vertex0.y + 0,vertex0.z + 1);
   int index3 = GetPointIndex(vertex0, dims);
-  Vec3<int> vectex4 = vertex0 + Vec3<int>(0, 1, 0);
+  Vec3<int> vectex4 = Vec3<int>(vertex0.x + 0,vertex0.y + 1,vertex0.z + 0);
   int index4 = GetPointIndex(vertex0, dims);
-  Vec3<int> vectex5 = vertex0 + Vec3<int>(1, 1, 0);
+  Vec3<int> vectex5 = Vec3<int>(vertex0.x + 1,vertex0.y + 1,vertex0.z + 0);
   int index5 = GetPointIndex(vertex0, dims);
-  Vec3<int> vectex6 = vertex0 + Vec3<int>(0, 1, 1);
+  Vec3<int> vectex6 = Vec3<int>(vertex0.x + 0,vertex0.y + 1,vertex0.z + 1);
   int index6 = GetPointIndex(vertex0, dims);
-  Vec3<int> vectex7 = vertex0 + Vec3<int>(1, 1, 1);
+  Vec3<int> vectex7 = Vec3<int>(vertex0.x + 1,vertex0.y + 1,vertex0.z + 1);
   int index7 = GetPointIndex(vertex0, dims);
 
   T difference1 = translated.x - vertex0.x;
@@ -80,17 +80,18 @@ T GetFieldValueForSample(Vec3<T> &currentSample, int *dims, T *bounds,
   T difference3 = translated.z - vertex0.z;
 
   //Interpolation in X (0,1), (2,3), (4,5), (6,7)
-  T f01 = Interpolate(difference1);
-  T f23 = Interpolate(difference1);
-  T f45 = Interpolate(difference1);
-  T f67 = Interpolate(difference1);
+  T f01 = Interpolate(fieldData[index0], fieldData[index1], difference1);
+  T f23 = Interpolate(fieldData[index2], fieldData[index3], difference1);
+  T f45 = Interpolate(fieldData[index4], fieldData[index5], difference1);
+  T f67 = Interpolate(fieldData[index6], fieldData[index7], difference1);
 
   //Interpolation in Y
-
+  T f0123 = Interpolate(f01, f23, difference2);
+  T f4567 = Interpolate(f45, f67, difference2);
 
   //Interpolaiton in Z
-
-
+  T sampleValue = Interpolate(f0123, f4567, difference3);
+  return sampleValue;
 }
 
 template <typename T>
@@ -110,6 +111,8 @@ void Sample(Camera<T> &camera, Vec3<T> &ray, const int samplerate,
     Vec3<T> offset = Multiply(ray, distance);
     currentSample = origin + offset;
     PrintVector(currentSample);
+    T sampleValue = GetFieldValueForSample(currentSample, dims, bounds, gridprop, fieldData);
+    std::cout << "field value" << sampleValue << std::endl;
     distance += samplingdiff;
     ++count;
   } while (count < 10);

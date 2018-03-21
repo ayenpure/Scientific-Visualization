@@ -5,6 +5,12 @@
 #define WIDTH 100
 #define PI 3.14159265
 
+template <typename T>
+T Interpolate(T fieldValue1, T fieldValue2, T proportion)
+{
+  return (1.0 - proportion)*fieldValue1 + proportion*fieldValue2;
+}
+
 template <typename T> struct Vec3 {
   T x, y, z;
 
