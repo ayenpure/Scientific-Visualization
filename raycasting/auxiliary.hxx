@@ -1,9 +1,9 @@
 #include <cmath>
 #include <iostream>
 
-#define HEIGHT 100
-#define WIDTH 100
-#define SAMPLES 256
+#define HEIGHT 1000
+#define WIDTH 1000
+#define SAMPLES 1024
 
 #define PI 3.14159265
 
