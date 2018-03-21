@@ -5,8 +5,8 @@
 #define WIDTH 100
 #define PI 3.14159265
 
-template <typename T>
-T Interpolate(T fieldValue1, T fieldValue2, T proportion)
+template <typename T, typename U>
+T Interpolate(U fieldValue1, U fieldValue2, T proportion)
 {
   return (1.0 - proportion)*fieldValue1 + proportion*fieldValue2;
 }
@@ -131,12 +131,15 @@ struct TransferFunction {
   //   bin 9 = 3.8->4.0
   // and, for example, a "value" of 3.15 would return the color in bin 5
   // and the opacity at "opacities[5]".
-  void ApplyTransferFunction(double value, unsigned char *RGB,
-                             double &opacity) {
+  template<typename T, typename U>
+  void ApplyTransferFunction(T value, Vec3<U>& RGB,
+                             T &opacity) {
+     if(value < min || value > max)
+       return;
      int bin = (value - min) * scalingFactor;
-     RGB[0] = colors[3*bin+0];
-     RGB[1] = colors[3*bin+1];
-     RGB[2] = colors[3*bin+2];
+     RGB.x = colors[3*bin+0];
+     RGB.y = colors[3*bin+1];
+     RGB.z = colors[3*bin+2];
      opacity = opacities[bin];
   }
 };
