@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <sys/time.h>
 
 #include "auxiliary.hxx"
 #include "vtkDataArray.h"
@@ -74,13 +75,6 @@ T GetFieldValueForSample(Vec3<T> &currentSample, int *dims, double *bounds,
       vertex0.z = i;
   }
 
-  //  std::cout << "Looking for point" << "\t";
-  // PrintVector(currentSample);
-  /*Vec3<int> vertex0 =
-      Vec3<int>((int)translated.x, (int)translated.y, (int)translated.z);*/
-  //  std::cout << "Found Cell" << "\t";
-  // PrintVector(vertex0);
-
   int index0 = GetPointIndex(vertex0, dims);
   Vec3<int> vertex1 = Vec3<int>(vertex0.x + 1, vertex0.y + 0, vertex0.z + 0);
   int index1 = GetPointIndex(vertex1, dims);
@@ -136,26 +130,17 @@ void Sample(Camera<T> &camera, Vec3<T> &ray, const int samples, T samplingdiff,
   Vec3<double> color(0, 0, 0);
   T opacity = 0;
   do {
-    //std::cout << "********************* sample :" << count << "*********************" << std::endl;
     Vec3<T> offset = Multiply(ray, distance);
     currentSample = origin + offset;
-    //PrintVector(currentSample);
     T sampleValue =
         GetFieldValueForSample(currentSample, dims, bounds, gridprop, fieldData,
                                xCoords, yCoords, zCoords);
-    //std::cout << "field value : " << sampleValue << std::endl;
     T backopacity = 0;
     Vec3<unsigned char> backcolor(0, 0, 0);
     transfer.ApplyTransferFunction(sampleValue, backcolor, backopacity);
-/*
-    std::cout << "mapped color : " << (int)backcolor.x << ", "
-              << (int)backcolor.y << ", " << (int)backcolor.z << std::endl;
-    std::cout << "mapped opacity : " << backopacity << std::endl;
-*/
-    backopacity = 1 - pow((1 - backopacity), 500 / (T)samples);
-    //std::cout << "Corrected opacity : " << backopacity << std::endl;
 
-    // Blending values
+    backopacity = 1 - pow((1 - backopacity), 500 / (T)samples);
+
     color.x =
         color.x + (1 - opacity) * backopacity * (backcolor.x / 255.0);
     color.y =
@@ -164,27 +149,12 @@ void Sample(Camera<T> &camera, Vec3<T> &ray, const int samples, T samplingdiff,
         color.z + (1 - opacity) * backopacity * (backcolor.z / 255.0);
     opacity = opacity + (1 - opacity) * backopacity;
 
-    /*color.x =
-        backopacity * backcolor.x / 255.0 + (1 - backopacity) * opacity * (color.x);
-    color.x =
-        backopacity * backcolor.y / 255.0 + (1 - backopacity) * opacity * (color.y);
-    color.x =
-        backopacity * backcolor.z / 255.0 + (1 - backopacity) * opacity * (color.z);
-    opacity = backopacity + (1 - backopacity) * opacity;
-*/
-
-/*    std::cout << "Running : " << color.x << ", " << color.y << ", " << color.z
-              << std::endl;
-    std::cout << "Opacity : " << opacity << std::endl;
-*/
     distance += samplingdiff;
     ++count;
   } while (count < samples);
   pixelColor.x = (unsigned char)(color.x * 255);
   pixelColor.y = (unsigned char)(color.y * 255);
   pixelColor.z = (unsigned char)(color.z * 255);
-/*  std::cout << "Final : " << (int)pixelColor.x << ", " << (int)pixelColor.y << ", " << (int)pixelColor.z
-              << std::endl; */
 }
 
 int main(int argc, char **argv) {
@@ -223,7 +193,6 @@ int main(int argc, char **argv) {
   Camera<double> camera = SetupCamera<double>();
   Vec3<double> look, forX, forY;
   CalculateViewParameters(camera, look, forX, forY);
-  // std::cout << "Sampling rate : " << camera.far - camera.near << std::endl;
   double samplingdiff = (camera.far - camera.near) / (double)(samples - 1);
 
   TransferFunction transfer = SetupTransferFunction();
@@ -235,6 +204,9 @@ int main(int argc, char **argv) {
   image->SetDimensions(width, height, 1);
   image->AllocateScalars(VTK_UNSIGNED_CHAR, 3);
   unsigned char *imagedata = (unsigned char *)image->GetScalarPointer(0, 0, 0);
+
+  struct timeval startTime;
+  gettimeofday(&startTime, 0);
 
   for (size_t pixelX = 0; pixelX < width; ++pixelX)
     for (size_t pixelY = 0; pixelY < height; ++pixelY) {
@@ -254,8 +226,11 @@ int main(int argc, char **argv) {
       imagedata[pixelindex++] = pixelcolor.y;
       imagedata[pixelindex++] = pixelcolor.z;
     }
-  /*std::cout << "Number of intersection : " << intersections << " out of "
-            << height * width << " pixels" << std::endl;*/
+
+  struct timeval endTime;
+  gettimeofday(&endTime, 0);
+  double seconds = double(endTime.tv_sec - startTime.tv_sec) + double(endTime.tv_usec - startTime.tv_usec) / 1000000;
+  cerr << "Time to render = " << seconds << endl;
 
   const std::string outfilename("output.png");
   vtkPNGWriter *writer = vtkPNGWriter::New();
